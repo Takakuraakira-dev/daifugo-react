@@ -1,4 +1,5 @@
 
+import Card from "./components/Card";
 import { useEffect, useState } from "react";
 import { createDeck, shuffleDeck } from "./logic/deck";
 
@@ -229,6 +230,21 @@ function App() {
       <p>{message}</p>
 
       <h2>CPU（{cpuHand.length}枚）</h2>
+     
+    <div style={{ display: "flex", gap: 8 }}>
+       {cpuHand.map((_, i) => (
+    <div
+       key={i}
+        style={{
+        width: 50,
+        height: 70,
+        background: "#333",
+        borderRadius: 6,
+        border: "2px solid #000",
+      }}
+        />
+       ))}
+        </div>
 
       <div style={{ margin: "20px 0" }}>
         {field.table ? (
