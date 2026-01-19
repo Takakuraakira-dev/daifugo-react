@@ -1,4 +1,3 @@
-
 import Card from "./components/Card";
 import { useEffect, useState } from "react";
 import { createDeck, shuffleDeck } from "./logic/deck";
@@ -424,3 +423,4 @@ function App() {
 }
 
 export default App;
+
