@@ -2,6 +2,63 @@
 import Card from "./components/Card";
 import { useEffect, useState } from "react";
 import { createDeck, shuffleDeck } from "./logic/deck";
+const applySpecialRules = ({
+  cards,
+  actor, // "player" | "cpu"
+  playerHand,
+  cpuHand,
+}) => {
+  const rank = cards[0].rank;
+  const count = cards.length;
+
+  let newPlayerHand = [...playerHand];
+  let newCpuHand = [...cpuHand];
+
+  /* ===== 8切り ===== */
+  if (rank === "8") {
+    return {
+      newPlayerHand,
+      newCpuHand,
+      clearTable: true,
+      nextTurn: actor, // 同じ人が続行
+      message: `🔥 ${actor === "cpu" ? "CPU" : "あなた"}の8切り！`,
+    };
+  }
+
+  /* ===== イレブンバック ===== */
+  if (rank === "J") {
+    setElevenBack((prev) => !prev);
+  }
+
+  /* ===== 革命 ===== */
+  if (count === 4) {
+    setRevolution((prev) => !prev);
+  }
+
+  /* ===== 7渡し ===== */
+  if (rank === "7") {
+    for (let i = 0; i < count; i++) {
+      if (actor === "cpu" && newCpuHand.length > 0) {
+        const weakest = [...newCpuHand].sort((a, b) => a.power - b.power)[0];
+        newCpuHand = newCpuHand.filter((c) => c !== weakest);
+        newPlayerHand.push(weakest);
+      }
+      if (actor === "player" && newPlayerHand.length > 0) {
+        const weakest = [...newPlayerHand].sort((a, b) => a.power - b.power)[0];
+        newPlayerHand = newPlayerHand.filter((c) => c !== weakest);
+        newCpuHand.push(weakest);
+      }
+    }
+  }
+
+  return {
+    newPlayerHand,
+    newCpuHand,
+    clearTable: false,
+    nextTurn: actor === "cpu" ? "player" : "cpu",
+    message: "",
+  };
+};
 
 function App() {
   const [playerHand, setPlayerHand] = useState([]);
@@ -175,42 +232,118 @@ function App() {
 
   /* ===== CPU ===== */
   const cpuTurn = (hand) => {
+    console.log("🤖 cpuTurn 実行");
+  
+    const { table, passCount } = field;
+  
+    /* ===== 出せる手を作る ===== */
     const groups = {};
-    hand.forEach(c => {
+    hand.forEach((c) => {
       groups[c.rank] = groups[c.rank] || [];
       groups[c.rank].push(c);
     });
-
-    let playable = [];
-
-    Object.values(groups).forEach(g => {
-      if (!field.table) {
-        playable.push([g[0]]);
-      } else if (g.length >= field.table.count) {
-        const cand = g.slice(0, field.table.count);
-        if (canPlaySet(cand)) playable.push(cand);
+  
+    let playableSets = [];
+  
+    Object.values(groups).forEach((g) => {
+      // 場が空 → 1枚
+      if (!table) {
+        playableSets.push([g[0]]);
+      }
+      // 場あり → 枚数一致＋強さ判定
+      else if (g.length >= table.count) {
+        const candidate = g.slice(0, table.count);
+        if (canPlaySet(candidate)) {
+          playableSets.push(candidate);
+        }
       }
     });
-
-    if (!playable.length) {
+  
+    /* ===== 出せない → パス ===== */
+    if (playableSets.length === 0) {
+      console.log("🤖 CPU パス");
       setMessage("CPUはパス");
-      setField(prev => ({
+  
+      setField((prev) => ({
         ...prev,
         passCount: prev.passCount + 1,
       }));
+  
       setTurn("player");
       return;
     }
-
-    const set = playable.sort((a, b) => a[0].power - b[0].power)[0];
-
+  
+    /* ===== 一番弱い手を出す ===== */
+    const set = playableSets.sort(
+      (a, b) => a[0].power - b[0].power
+    )[0];
+  
+    console.log("🤖 CPU 出す:", set);
+  
+    /* ===== 手牌削除 ===== */
     let newCpuHand = [...hand];
-    set.forEach(c => {
-      newCpuHand = newCpuHand.filter(x => x !== c);
+    set.forEach((c) => {
+      newCpuHand = newCpuHand.filter((x) => x !== c);
     });
-
     setCpuHand(newCpuHand);
-
+  
+    /* ===== 役処理 ===== */
+  
+    // 🔥 8切り
+    if (set[0].rank === "8") {
+      setField({
+        table: null,
+        passCount: 0,
+      });
+  
+      setMessage("🔥 CPUの8切り！");
+      setTurn("cpu"); // もう一度CPU
+      return;
+    }
+  
+    // 🎁 7渡し
+    if (set[0].rank === "7") {
+      let newPlayerHand = [...playerHand];
+  
+      for (let i = 0; i < set.length; i++) {
+        if (newCpuHand.length === 0) break;
+        const weakest = [...newCpuHand].sort(
+          (a, b) => a.power - b.power
+        )[0];
+        newCpuHand = newCpuHand.filter((c) => c !== weakest);
+        newPlayerHand.push(weakest);
+      }
+  
+      setCpuHand(newCpuHand);
+      setPlayerHand(newPlayerHand);
+  
+      setField({
+        table: {
+          rank: "7",
+          power: set[0].power,
+          count: set.length,
+        },
+        passCount: 0,
+      });
+  
+      setMessage("🎁 CPUの7渡し！");
+      setTurn("player");
+      return;
+    }
+  
+    // ⬇️ イレブンバック
+    if (set[0].rank === "J") {
+      setElevenBack((prev) => !prev);
+      setMessage("⬇️ CPUのイレブンバック！");
+    }
+  
+    // 🔄 革命
+    if (set.length === 4) {
+      setRevolution((prev) => !prev);
+      setMessage("🔄 CPUの革命！");
+    }
+  
+    /* ===== 通常出し ===== */
     setField({
       table: {
         rank: set[0].rank,
@@ -219,10 +352,11 @@ function App() {
       },
       passCount: 0,
     });
-
+  
     setTurn("player");
   };
-
+  
+  
   /* ===== UI ===== */
   return (
     <div style={{ padding: 20 }}>
