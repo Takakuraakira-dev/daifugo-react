@@ -1,129 +1,115 @@
-import Card from "./components/Card";
 import { useEffect, useState } from "react";
+import Card from "./components/Card";
 import { createDeck, shuffleDeck } from "./logic/deck";
-const applySpecialRules = ({
-  cards,
-  actor, // "player" | "cpu"
-  playerHand,
-  cpuHand,
-}) => {
-  const rank = cards[0].rank;
-  const count = cards.length;
-
-  let newPlayerHand = [...playerHand];
-  let newCpuHand = [...cpuHand];
-
-  /* ===== 8切り ===== */
-  if (rank === "8") {
-    return {
-      newPlayerHand,
-      newCpuHand,
-      clearTable: true,
-      nextTurn: actor, // 同じ人が続行
-      message: `🔥 ${actor === "cpu" ? "CPU" : "あなた"}の8切り！`,
-    };
-  }
-
-  /* ===== イレブンバック ===== */
-  if (rank === "J") {
-    setElevenBack((prev) => !prev);
-  }
-
-  /* ===== 革命 ===== */
-  if (count === 4) {
-    setRevolution((prev) => !prev);
-  }
-
-  /* ===== 7渡し ===== */
-  if (rank === "7") {
-    for (let i = 0; i < count; i++) {
-      if (actor === "cpu" && newCpuHand.length > 0) {
-        const weakest = [...newCpuHand].sort((a, b) => a.power - b.power)[0];
-        newCpuHand = newCpuHand.filter((c) => c !== weakest);
-        newPlayerHand.push(weakest);
-      }
-      if (actor === "player" && newPlayerHand.length > 0) {
-        const weakest = [...newPlayerHand].sort((a, b) => a.power - b.power)[0];
-        newPlayerHand = newPlayerHand.filter((c) => c !== weakest);
-        newCpuHand.push(weakest);
-      }
-    }
-  }
-
-  return {
-    newPlayerHand,
-    newCpuHand,
-    clearTable: false,
-    nextTurn: actor === "cpu" ? "player" : "cpu",
-    message: "",
-  };
-};
-
-function App() {
-  const [playerHand, setPlayerHand] = useState([]);
-  const [cpuHand, setCpuHand] = useState([]);
+const ROLE_MAP = [
+  "🏆 大富豪",
+  "⚠️ 富豪",
+  "🙂 平民",
+  "💀 大貧民",
+];
+export default function App() {
+  /* ===== プレイヤー ===== */
+  const [players, setPlayers] = useState([]);
+  const [turnIndex, setTurnIndex] = useState(0);
+  const [rankings, setRankings] = useState([]);
   const [selectedCards, setSelectedCards] = useState([]);
   const [gameStarted, setGameStarted] = useState(false);
-  // ⭐ field に統合
+  /* ===== フィールド ===== */
   const [field, setField] = useState({
-    table: null,     // { rank, power, count } | null
+    table: null, // { rank, power, count }
     passCount: 0,
   });
 
-  const [turn, setTurn] = useState("player");
-  const [message, setMessage] = useState("");
-  const [winner, setWinner] = useState(null);
-
+  /* ===== ルール ===== */
   const [revolution, setRevolution] = useState(false);
   const [elevenBack, setElevenBack] = useState(false);
 
-  /* ===== 初期配布 ===== */
+  /* ===== 状態 ===== */
+  const [message, setMessage] = useState("");
+  const [winner, setWinner] = useState(null);
+ 
+  /* ===== 初期配布（4人） ===== */
   useEffect(() => {
     const deck = shuffleDeck(createDeck());
-    setPlayerHand(deck.slice(0, 13));
-    setCpuHand(deck.slice(13, 26));
-    setGameStarted(true); // ← これ超重要
-
+    const hands = Array.from({ length: 4 }, () => []);
+  
+    deck.forEach((card, i) => {
+      hands[i % 4].push(card);
+    });
+  
+    setPlayers([
+      { id: "you", name: "YOU", hand: hands[0], isCPU: false },
+      { id: "cpu1", name: "CPU 1", hand: hands[1], isCPU: true },
+      { id: "cpu2", name: "CPU 2", hand: hands[2], isCPU: true },
+      { id: "cpu3", name: "CPU 3", hand: hands[3], isCPU: true },
+    ]);
+    setRankings([]);          // ← ★ここ
+    setTurnIndex(0);
+    setGameStarted(true);
   }, []);
-
-  /* ===== 勝敗 ===== */
-  useEffect(() => {
-    if (!gameStarted) return;
+   
   
-    if (playerHand.length === 0) setWinner("player");
-    if (cpuHand.length === 0) setWinner("cpu");
-  }, [playerHand, cpuHand, gameStarted]);
+    
+  const currentPlayer = players[turnIndex];
+  const you = players.find(p => p.id === "you");
+  const gameFinished = rankings.length === players.length;
   
-  /* ===== CPU自動行動 ===== */
-  useEffect(() => {
-    if (turn !== "cpu" || winner) return;
+  const rankedWithRoles = gameFinished
+  ? rankings.map((p, index) => ({
+      ...p,
+      role: ROLE_MAP[index],
+    }))
+  : [];
 
-    const timer = setTimeout(() => {
-      cpuTurn(cpuHand);
-    }, 700);
-
-    return () => clearTimeout(timer);
-  }, [turn, cpuHand, winner]);
-
-  /* ===== 全員パスで場流し ===== */
-  useEffect(() => {
-    if (field.passCount >= 2 && field.table) {
-      setField({ table: null, passCount: 0 });
-      setMessage("全員パス！場が流れました");
-      setTurn("player");
+  const isYourTurn =
+    gameStarted && currentPlayer?.id === "you";
+  /* ===== 勝敗判定 ===== */
+ /* ===== 勝敗判定 & 最後の1人自動追加 ===== */
+useEffect(() => {
+  // ① 手札0の人を順に rankings に追加
+  players.forEach((p) => {
+    if (p.hand.length === 0 && !rankings.includes(p.id)) {
+      setRankings((prev) => [...prev, p.id]);
     }
-  }, [field]);
+  });
 
+  // ② 残り1人になったら自動で追加（超重要）
+  const remaining = players.filter(
+    (p) => !rankings.includes(p.id)
+  );
+
+  if (remaining.length === 1) {
+    setRankings((prev) => [...prev, remaining[0].id]);
+  }
+}, [players, rankings]);
+
+  
+  
+  /* ===== 順位確定（上がり判定）===== */
+  useEffect(() => {
+    players.forEach((p) => {
+      if (
+        p.hand.length === 0 &&
+        !rankings.find(r => r.id === p.id)
+      ) {
+        setRankings((prev) => [
+          ...prev,
+          { id: p.id, name: p.name },
+        ]);
+      }
+    });
+  }, [players, rankings]);
+  
+
+  
   /* ===== 出せるか判定 ===== */
   const canPlaySet = (cards) => {
     if (!cards.length) return false;
 
     const rank = cards[0].rank;
-    if (!cards.every(c => c.rank === rank)) return false;
+    if (!cards.every((c) => c.rank === rank)) return false;
 
-    // 場が空 → 何でもOK
     if (!field.table) return true;
-
     if (cards.length !== field.table.count) return false;
 
     const reversed = revolution !== elevenBack;
@@ -134,10 +120,10 @@ function App() {
 
   /* ===== カード選択 ===== */
   const handleCardClick = (card) => {
-    if (turn !== "player") return;
+    if (!isYourTurn) return;
 
     if (selectedCards.includes(card)) {
-      setSelectedCards(selectedCards.filter(c => c !== card));
+      setSelectedCards(selectedCards.filter((c) => c !== card));
       return;
     }
 
@@ -151,198 +137,133 @@ function App() {
     }
   };
 
+  /* ===== ターン進行 ===== */
+  const nextTurn = () => {
+    setTurnIndex((i) => (i + 1) % players.length);
+  };
+
   /* ===== パス ===== */
   const passTurn = () => {
     setSelectedCards([]);
-    setMessage("あなたはパスしました");
-    setField(prev => ({
-      ...prev,
-      passCount: prev.passCount + 1,
-    }));
-    setTurn("cpu");
+    setMessage("YOUはパス");
+    setField((f) => ({ ...f, passCount: f.passCount + 1 }));
+    nextTurn();
   };
 
-  /* ===== 出す ===== */
+  /* ===== 全員パスで流し ===== */
+  useEffect(() => {
+    if (field.passCount >= players.length - 1 && field.table) {
+      setField({ table: null, passCount: 0 });
+      setMessage("全員パス！場が流れました");
+    }
+  }, [field, players.length]);
+
+  /* ===== YOUが出す ===== */
   const playCards = () => {
+    if (!isYourTurn) return;
+    if (selectedCards.length === 0) return;
     if (!canPlaySet(selectedCards)) return;
 
-    const rank = selectedCards[0].rank;
-    const power = selectedCards[0].power;
-    const count = selectedCards.length;
+    const set = selectedCards;
+    const rank = set[0].rank;
 
-    let newPlayerHand = [...playerHand];
-    let newCpuHand = [...cpuHand];
+    // 手牌削除
+    setPlayers((prev) =>
+      prev.map((p) =>
+        p.id === "you"
+          ? { ...p, hand: p.hand.filter((c) => !set.includes(c)) }
+          : p
+      )
+    );
 
-    /* ===== イレブンバック ===== */
-    if (rank === "J") {
-      setElevenBack(prev => !prev);
-      setMessage("⬇️ イレブンバック発動！");
-    }
-
-    /* ===== 7渡し（簡易・自動）===== */
-    if (rank === "7") {
-      const give = newPlayerHand
-        .filter(c => c.rank !== "7")
-        .slice(0, count);
-
-      newPlayerHand = newPlayerHand.filter(c => !give.includes(c));
-      newCpuHand = [...newCpuHand, ...give];
-      setMessage(`🎁 7渡し！${count}枚渡しました`);
-    }
-
-    /* ===== 8切り ===== */
+    /* ==== 役 ==== */
     if (rank === "8") {
-      selectedCards.forEach(c => {
-        newPlayerHand = newPlayerHand.filter(x => x !== c);
-      });
-
-      setPlayerHand(newPlayerHand);
-      setCpuHand(newCpuHand);
-
       setField({ table: null, passCount: 0 });
       setSelectedCards([]);
-      setMessage("🔥 8切り！もう一度あなたのターン！");
-      setTurn("player");
+      setMessage("🔥 8切り！もう一度！");
       return;
     }
 
-    /* ===== 革命 ===== */
-    if (count === 4) {
-      setRevolution(prev => !prev);
-      setMessage("🔄 革命発動！");
+    if (rank === "J") {
+      setElevenBack((p) => !p);
+      setMessage("⬇️ イレブンバック！");
     }
 
-    /* ===== 手牌削除 ===== */
-    selectedCards.forEach(c => {
-      newPlayerHand = newPlayerHand.filter(x => x !== c);
-    });
-
-    setPlayerHand(newPlayerHand);
-    setCpuHand(newCpuHand);
-    setSelectedCards([]);
+    if (set.length === 4) {
+      setRevolution((p) => !p);
+      setMessage("🔄 革命！");
+    }
 
     setField({
-      table: { rank, power, count },
+      table: {
+        rank,
+        power: set[0].power,
+        count: set.length,
+      },
       passCount: 0,
     });
 
-    setTurn("cpu");
+    setSelectedCards([]);
+    nextTurn();
   };
 
-  /* ===== CPU ===== */
-  const cpuTurn = (hand) => {
-    console.log("🤖 cpuTurn 実行");
-  
-    const { table, passCount } = field;
-  
-    /* ===== 出せる手を作る ===== */
+  /* ===== CPU自動行動 ===== */
+  useEffect(() => {
+    if (!currentPlayer || !currentPlayer.isCPU || winner) return;
+
+    const timer = setTimeout(() => {
+      cpuTurn(currentPlayer);
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, [turnIndex, currentPlayer, winner]);
+
+  const cpuTurn = (cpu) => {
+    const hand = cpu.hand;
+
     const groups = {};
     hand.forEach((c) => {
       groups[c.rank] = groups[c.rank] || [];
       groups[c.rank].push(c);
     });
-  
-    let playableSets = [];
-  
+
+    let playable = [];
+
     Object.values(groups).forEach((g) => {
-      // 場が空 → 1枚
-      if (!table) {
-        playableSets.push([g[0]]);
-      }
-      // 場あり → 枚数一致＋強さ判定
-      else if (g.length >= table.count) {
-        const candidate = g.slice(0, table.count);
-        if (canPlaySet(candidate)) {
-          playableSets.push(candidate);
-        }
+      if (!field.table) playable.push([g[0]]);
+      else if (g.length >= field.table.count) {
+        const s = g.slice(0, field.table.count);
+        if (canPlaySet(s)) playable.push(s);
       }
     });
-  
-    /* ===== 出せない → パス ===== */
-    if (playableSets.length === 0) {
-      console.log("🤖 CPU パス");
-      setMessage("CPUはパス");
-  
-      setField((prev) => ({
-        ...prev,
-        passCount: prev.passCount + 1,
-      }));
-  
-      setTurn("player");
+
+    if (!playable.length) {
+      setMessage(`${cpu.name} はパス`);
+      setField((f) => ({ ...f, passCount: f.passCount + 1 }));
+      nextTurn();
       return;
     }
-  
-    /* ===== 一番弱い手を出す ===== */
-    const set = playableSets.sort(
-      (a, b) => a[0].power - b[0].power
-    )[0];
-  
-    console.log("🤖 CPU 出す:", set);
-  
-    /* ===== 手牌削除 ===== */
-    let newCpuHand = [...hand];
-    set.forEach((c) => {
-      newCpuHand = newCpuHand.filter((x) => x !== c);
-    });
-    setCpuHand(newCpuHand);
-  
-    /* ===== 役処理 ===== */
-  
-    // 🔥 8切り
+
+    const set = playable.sort((a, b) => a[0].power - b[0].power)[0];
+
+    // 手牌削除
+    setPlayers((prev) =>
+      prev.map((p) =>
+        p.id === cpu.id
+          ? { ...p, hand: p.hand.filter((c) => !set.includes(c)) }
+          : p
+      )
+    );
+
     if (set[0].rank === "8") {
-      setField({
-        table: null,
-        passCount: 0,
-      });
-  
-      setMessage("🔥 CPUの8切り！");
-      setTurn("cpu"); // もう一度CPU
+      setField({ table: null, passCount: 0 });
+      setMessage(`🔥 ${cpu.name} の8切り！`);
       return;
     }
-  
-    // 🎁 7渡し
-    if (set[0].rank === "7") {
-      let newPlayerHand = [...playerHand];
-  
-      for (let i = 0; i < set.length; i++) {
-        if (newCpuHand.length === 0) break;
-        const weakest = [...newCpuHand].sort(
-          (a, b) => a.power - b.power
-        )[0];
-        newCpuHand = newCpuHand.filter((c) => c !== weakest);
-        newPlayerHand.push(weakest);
-      }
-  
-      setCpuHand(newCpuHand);
-      setPlayerHand(newPlayerHand);
-  
-      setField({
-        table: {
-          rank: "7",
-          power: set[0].power,
-          count: set.length,
-        },
-        passCount: 0,
-      });
-  
-      setMessage("🎁 CPUの7渡し！");
-      setTurn("player");
-      return;
-    }
-  
-    // ⬇️ イレブンバック
-    if (set[0].rank === "J") {
-      setElevenBack((prev) => !prev);
-      setMessage("⬇️ CPUのイレブンバック！");
-    }
-  
-    // 🔄 革命
-    if (set.length === 4) {
-      setRevolution((prev) => !prev);
-      setMessage("🔄 CPUの革命！");
-    }
-  
-    /* ===== 通常出し ===== */
+
+    if (set[0].rank === "J") setElevenBack((p) => !p);
+    if (set.length === 4) setRevolution((p) => !p);
+
     setField({
       table: {
         rank: set[0].rank,
@@ -351,76 +272,84 @@ function App() {
       },
       passCount: 0,
     });
-  
-    setTurn("player");
+
+    setMessage(`${cpu.name} が出しました`);
+    nextTurn();
   };
-  
-  
+
   /* ===== UI ===== */
   return (
     <div style={{ padding: 20 }}>
       <h1>大富豪</h1>
       <p>{message}</p>
-
-      <h2>CPU（{cpuHand.length}枚）</h2>
-     
-    <div style={{ display: "flex", gap: 8 }}>
-       {cpuHand.map((_, i) => (
-    <div
-       key={i}
-        style={{
-        width: 50,
-        height: 70,
-        background: "#333",
-        borderRadius: 6,
-        border: "2px solid #000",
-      }}
-        />
-       ))}
-        </div>
-
-      <div style={{ margin: "20px 0" }}>
+  
+      {/* ===== CPU ===== */}
+      {players
+        .filter((p) => p.isCPU)
+        .map((cpu) => (
+          <div key={cpu.id} style={{ marginBottom: 8 }}>
+            {cpu.name}（{cpu.hand.length}枚）
+            <div style={{ display: "flex", gap: 4 }}>
+              {cpu.hand.map((_, i) => (
+                <div
+                  key={i}
+                  style={{
+                    width: 40,
+                    height: 60,
+                    background: "#333",
+                    borderRadius: 4,
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
+  
+      {/* ===== 場 ===== */}
+      <div style={{ margin: 20 }}>
         {field.table ? (
           Array.from({ length: field.table.count }).map((_, i) => (
-            <span key={i} style={{ margin: 8 }}>
+            <span key={i} style={{ margin: 6 }}>
               {field.table.rank}
             </span>
           ))
         ) : (
-          <span>ここにカードを出します</span>
+          <span>場は空です</span>
         )}
       </div>
-
-      <h2>あなたの手札</h2>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        {playerHand.map((card, i) => (
-          <div
+  
+      {/* ===== YOU ===== */}
+      <h2>YOU</h2>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        {you?.hand.map((card, i) => (
+          <Card
             key={i}
+            card={card}
+            selected={selectedCards.includes(card)}
             onClick={() => handleCardClick(card)}
-            style={{
-              border: selectedCards.includes(card)
-                ? "2px solid red"
-                : "1px solid black",
-              padding: 8,
-              cursor: "pointer",
-            }}
-          >
-            {card.rank}{card.suit}
-          </div>
+          />
         ))}
       </div>
-
-      {!winner && (
+  
+      {/* ===== 操作ボタン ===== */}
+      {!winner && isYourTurn && !gameFinished && (
         <div style={{ marginTop: 16 }}>
           <button onClick={playCards}>出す</button>
           <button onClick={passTurn}>パス</button>
         </div>
       )}
-
-      {winner && <h2>{winner === "player" ? "🎉 YOU WIN" : "🤖 CPU WIN"}</h2>}
+  
+      {/* ===== 結果発表 ===== */}
+      {gameFinished && (
+        <div style={{ marginTop: 24 }}>
+          <h2>🏆 結果発表</h2>
+          {rankedWithRoles.map((p, i) => (
+            <div key={p.id}>
+              {i + 1}位：{p.name}（{p.role}）
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
-
-export default App;
-
