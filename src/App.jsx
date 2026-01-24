@@ -52,54 +52,39 @@ export default function App() {
     
   const currentPlayer = players[turnIndex];
   const you = players.find(p => p.id === "you");
-  const gameFinished = rankings.length === players.length;
+  const gameFinished =
+  players.length > 0 &&
+  rankings.length === players.length;
+  
   
   const rankedWithRoles = gameFinished
-  ? rankings.map((p, index) => ({
-      ...p,
-      role: ROLE_MAP[index],
-    }))
+  ? rankings.map((id, index) => {
+      const player = players.find(p => p.id === id);
+
+      return {
+        ...player,
+        role: ROLE_MAP[index],
+      };
+    })
   : [];
+
 
   const isYourTurn =
     gameStarted && currentPlayer?.id === "you";
-  /* ===== 勝敗判定 ===== */
- /* ===== 勝敗判定 & 最後の1人自動追加 ===== */
+/* ===== 勝敗判定 ===== */
 useEffect(() => {
-  // ① 手札0の人を順に rankings に追加
+  if (!players.length) return;
+
   players.forEach((p) => {
     if (p.hand.length === 0 && !rankings.includes(p.id)) {
+      console.log("追加:", p.name);
       setRankings((prev) => [...prev, p.id]);
     }
   });
 
-  // ② 残り1人になったら自動で追加（超重要）
-  const remaining = players.filter(
-    (p) => !rankings.includes(p.id)
-  );
+}, [players]);
 
-  if (remaining.length === 1) {
-    setRankings((prev) => [...prev, remaining[0].id]);
-  }
-}, [players, rankings]);
 
-  
-  
-  /* ===== 順位確定（上がり判定）===== */
-  useEffect(() => {
-    players.forEach((p) => {
-      if (
-        p.hand.length === 0 &&
-        !rankings.find(r => r.id === p.id)
-      ) {
-        setRankings((prev) => [
-          ...prev,
-          { id: p.id, name: p.name },
-        ]);
-      }
-    });
-  }, [players, rankings]);
-  
 
   
   /* ===== 出せるか判定 ===== */
@@ -258,6 +243,7 @@ useEffect(() => {
     if (set[0].rank === "8") {
       setField({ table: null, passCount: 0 });
       setMessage(`🔥 ${cpu.name} の8切り！`);
+      nextTurn(); // ⭐ これ超重要
       return;
     }
 
