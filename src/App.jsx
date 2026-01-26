@@ -262,80 +262,122 @@ useEffect(() => {
     setMessage(`${cpu.name} が出しました`);
     nextTurn();
   };
-
-  /* ===== UI ===== */
-  return (
-    <div style={{ padding: 20 }}>
-      <h1>大富豪</h1>
-      <p>{message}</p>
-  
-      {/* ===== CPU ===== */}
-      {players
-        .filter((p) => p.isCPU)
-        .map((cpu) => (
-          <div key={cpu.id} style={{ marginBottom: 8 }}>
-            {cpu.name}（{cpu.hand.length}枚）
-            <div style={{ display: "flex", gap: 4 }}>
-              {cpu.hand.map((_, i) => (
-                <div
-                  key={i}
-                  style={{
-                    width: 40,
-                    height: 60,
-                    background: "#333",
-                    borderRadius: 4,
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-        ))}
-  
-      {/* ===== 場 ===== */}
-      <div style={{ margin: 20 }}>
-        {field.table ? (
-          Array.from({ length: field.table.count }).map((_, i) => (
-            <span key={i} style={{ margin: 6 }}>
-              {field.table.rank}
-            </span>
-          ))
-        ) : (
-          <span>場は空です</span>
-        )}
-      </div>
-  
-      {/* ===== YOU ===== */}
-      <h2>YOU</h2>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-        {you?.hand.map((card, i) => (
-          <Card
+  const renderCPU = (cpu) => (
+    <div>
+      <div>{cpu.name}（{cpu.hand.length}枚）</div>
+      <div style={{ display: "flex", gap: 4, justifyContent: "center" }}>
+        {cpu.hand.map((_, i) => (
+          <div
             key={i}
-            card={card}
-            selected={selectedCards.includes(card)}
-            onClick={() => handleCardClick(card)}
+            style={{
+              width: 40,
+              height: 60,
+              background: "#333",
+              borderRadius: 4,
+            }}
           />
         ))}
       </div>
+    </div>
+  );
   
-      {/* ===== 操作ボタン ===== */}
-      {!winner && isYourTurn && !gameFinished && (
-        <div style={{ marginTop: 16 }}>
-          <button onClick={playCards}>出す</button>
-          <button onClick={passTurn}>パス</button>
-        </div>
-      )}
+
+  /* ===== UI ===== */
+  return (
+    <div
+      style={{
+        height: "100vh",
+        display: "grid",
+        gridTemplateColumns: "1fr 2fr 1fr",
+        gridTemplateRows: "1fr 2fr 1fr",
+        gap: 10,
   
-      {/* ===== 結果発表 ===== */}
-      {gameFinished && (
-        <div style={{ marginTop: 24 }}>
-          <h2>🏆 結果発表</h2>
-          {rankedWithRoles.map((p, i) => (
-            <div key={p.id}>
-              {i + 1}位：{p.name}（{p.role}）
-            </div>
+        background: "#0b5d1e", // ← ここだけで背景OK
+        color: "white",
+        padding: 20,
+  
+        textAlign: "center",
+        alignItems: "center",
+      }}
+    >
+      {/* ===== 上 CPU2 ===== */}
+      <div style={{ gridColumn: 2, gridRow: 1 }}>
+        {players[2] && renderCPU(players[2])}
+      </div>
+  
+      {/* ===== 左 CPU1 ===== */}
+      <div style={{ gridColumn: 1, gridRow: 2 }}>
+        {players[1] && renderCPU(players[1])}
+      </div>
+  
+     {/* ===== 場 ===== */}
+<div
+  style={{
+    gridColumn: 2,
+    gridRow: 2,
+    margin: 20,
+    fontSize: 28,
+    fontWeight: "bold",
+    minHeight: 80,
+    display: "flex",
+    justifyContent: "center",
+    flexDirection: "column",
+    alignItems: "center",
+  }}
+>
+  {/* ⭐ メッセージ表示 */}
+  {message && (
+    <div style={{ marginBottom: 10, color: "#ffd700" }}>
+      {message}
+    </div>
+  )}
+
+  {field.table ? (
+    Array.from({ length: field.table.count }).map((_, i) => (
+      <span key={i} style={{ margin: 6 }}>
+        {field.table.rank}
+      </span>
+    ))
+  ) : (
+    <span>場は空です</span>
+  )}
+</div>
+
+
+      {/* ===== 右 CPU3 ===== */}
+      <div style={{ gridColumn: 3, gridRow: 2 }}>
+        {players[3] && renderCPU(players[3])}
+      </div>
+  
+      {/* ===== 下 YOU ===== */}
+      <div style={{ gridColumn: 2, gridRow: 3 }}>
+        <h2>YOU</h2>
+  
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 8,
+            justifyContent: "center",
+          }}
+        >
+          {you?.hand.map((card, i) => (
+            <Card
+              key={i}
+              card={card}
+              selected={selectedCards.includes(card)}
+              onClick={() => handleCardClick(card)}
+            />
           ))}
         </div>
-      )}
+  
+        {!winner && isYourTurn && !gameFinished && (
+          <div style={{ marginTop: 12 }}>
+            <button onClick={playCards}>出す</button>
+            <button onClick={passTurn}>パス</button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
