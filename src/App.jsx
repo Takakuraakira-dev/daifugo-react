@@ -262,18 +262,29 @@ useEffect(() => {
     setMessage(`${cpu.name} が出しました`);
     nextTurn();
   };
+ 
   const renderCPU = (cpu) => (
-    <div>
-      <div>{cpu.name}（{cpu.hand.length}枚）</div>
-      <div style={{ display: "flex", gap: 4, justifyContent: "center" }}>
+    <div style={{ textAlign: "center" }}>
+      <div style={{ marginBottom: 6 }}>
+        {cpu.name}（{cpu.hand.length}枚）
+      </div>
+  
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          gap: 4,
+          flexWrap: "wrap",
+        }}
+      >
         {cpu.hand.map((_, i) => (
           <div
             key={i}
             style={{
               width: 40,
               height: 60,
-              background: "#333",
-              borderRadius: 4,
+              background: "#222",
+              borderRadius: 6,
             }}
           />
         ))}
@@ -288,14 +299,15 @@ useEffect(() => {
       style={{
         height: "100vh",
         display: "grid",
+  
+        /* 3×3 テーブル配置 */
         gridTemplateColumns: "1fr 2fr 1fr",
         gridTemplateRows: "1fr 2fr 1fr",
-        gap: 10,
   
-        background: "#0b5d1e", // ← ここだけで背景OK
+        background: "#0b5d1e",
         color: "white",
-        padding: 20,
   
+        padding: 16,
         textAlign: "center",
         alignItems: "center",
       }}
@@ -310,40 +322,46 @@ useEffect(() => {
         {players[1] && renderCPU(players[1])}
       </div>
   
-     {/* ===== 場 ===== */}
-<div
-  style={{
-    gridColumn: 2,
-    gridRow: 2,
-    margin: 20,
-    fontSize: 28,
-    fontWeight: "bold",
-    minHeight: 80,
-    display: "flex",
-    justifyContent: "center",
-    flexDirection: "column",
-    alignItems: "center",
-  }}
->
-  {/* ⭐ メッセージ表示 */}
-  {message && (
-    <div style={{ marginBottom: 10, color: "#ffd700" }}>
-      {message}
-    </div>
-  )}
-
-  {field.table ? (
-    Array.from({ length: field.table.count }).map((_, i) => (
-      <span key={i} style={{ margin: 6 }}>
-        {field.table.rank}
-      </span>
-    ))
-  ) : (
-    <span>場は空です</span>
-  )}
-</div>
-
-
+      {/* ===== 中央（場） ===== */}
+      <div
+        style={{
+          gridColumn: 2,
+          gridRow: 2,
+  
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          alignItems: "center",
+  
+          fontSize: 28,
+          fontWeight: "bold",
+          minHeight: 120,
+        }}
+      >
+        {/* ⭐ メッセージ（8切り/革命/パス） */}
+        {message && (
+          <div
+            style={{
+              marginBottom: 12,
+              color: "#ffd700",
+              fontSize: 20,
+            }}
+          >
+            {message}
+          </div>
+        )}
+  
+        {field.table ? (
+          <div style={{ display: "flex", gap: 10 }}>
+            {Array.from({ length: field.table.count }).map((_, i) => (
+              <span key={i}>{field.table.rank}</span>
+            ))}
+          </div>
+        ) : (
+          <span>場は空です</span>
+        )}
+      </div>
+  
       {/* ===== 右 CPU3 ===== */}
       <div style={{ gridColumn: 3, gridRow: 2 }}>
         {players[3] && renderCPU(players[3])}
@@ -357,8 +375,9 @@ useEffect(() => {
           style={{
             display: "flex",
             flexWrap: "wrap",
-            gap: 8,
             justifyContent: "center",
+            gap: 8,
+            marginBottom: 12,
           }}
         >
           {you?.hand.map((card, i) => (
@@ -372,7 +391,7 @@ useEffect(() => {
         </div>
   
         {!winner && isYourTurn && !gameFinished && (
-          <div style={{ marginTop: 12 }}>
+          <div>
             <button onClick={playCards}>出す</button>
             <button onClick={passTurn}>パス</button>
           </div>
@@ -380,4 +399,5 @@ useEffect(() => {
       </div>
     </div>
   );
+  
 }
