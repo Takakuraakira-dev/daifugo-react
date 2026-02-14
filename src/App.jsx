@@ -78,13 +78,28 @@ useEffect(() => {
   if (!players.length) return;
 
   const finishedPlayers = players
-    .filter(p => p.hand.length === 0 && !rankings.includes(p.id))
-    .map(p => p.id);
+    .filter((p) => p.hand.length === 0 && !rankings.includes(p.id))
+    .map((p) => p.id);
 
+  // ① 上がった人を追加
   if (finishedPlayers.length > 0) {
-    setRankings(prev => [...prev, ...finishedPlayers]);
+    setRankings((prev) => [...prev, ...finishedPlayers]);
   }
-}, [players]);
+
+  // ② 残り1人になったら、その人も最下位として追加
+  const remaining = players.filter((p) => p.hand.length > 0);
+
+  if (
+    remaining.length === 1 &&
+    rankings.length + finishedPlayers.length === players.length - 1
+  ) {
+    const lastId = remaining[0].id;
+
+    if (!rankings.includes(lastId) && !finishedPlayers.includes(lastId)) {
+      setRankings((prev) => [...prev, lastId]);
+    }
+  }
+}, [players, rankings]);
 
 
   
