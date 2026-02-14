@@ -7,6 +7,21 @@ const ROLE_MAP = [
   "🙂 平民",
   "💀 大貧民",
 ];
+const RANK_ORDER = {
+  "3": 1,
+  "4": 2,
+  "5": 3,
+  "6": 4,
+  "7": 5,
+  "8": 6,
+  "9": 7,
+  "10": 8,
+  "J": 9,
+  "Q": 10,
+  "K": 11,
+  "A": 12,
+  "2": 13,
+};
 export default function App() {
   /* ===== プレイヤー ===== */
   const [players, setPlayers] = useState([]);
@@ -26,7 +41,6 @@ export default function App() {
 
   /* ===== 状態 ===== */
   const [message, setMessage] = useState("");
-  const [winner, setWinner] = useState(null);
  
   /* ===== 初期配布（4人） ===== */
   useEffect(() => {
@@ -36,7 +50,11 @@ export default function App() {
     deck.forEach((card, i) => {
       hands[i % 4].push(card);
     });
-  
+    
+    hands.forEach((hand) => {
+      hand.sort((a, b) => RANK_ORDER[b.rank] - RANK_ORDER[a.rank]);
+    });
+    
     setPlayers([
       { id: "you", name: "YOU", hand: hands[0], isCPU: false },
       { id: "cpu1", name: "CPU 1", hand: hands[1], isCPU: true },
@@ -75,15 +93,14 @@ export default function App() {
 useEffect(() => {
   if (!players.length) return;
 
-  players.forEach((p) => {
-    if (p.hand.length === 0 && !rankings.includes(p.id)) {
-      console.log("追加:", p.name);
-      setRankings((prev) => [...prev, p.id]);
-    }
-  });
+  const finishedPlayers = players
+    .filter(p => p.hand.length === 0 && !rankings.includes(p.id))
+    .map(p => p.id);
 
+  if (finishedPlayers.length > 0) {
+    setRankings(prev => [...prev, ...finishedPlayers]);
+  }
 }, [players]);
-
 
 
   
@@ -192,16 +209,17 @@ useEffect(() => {
     nextTurn();
   };
 
-  /* ===== CPU自動行動 ===== */
-  useEffect(() => {
-    if (!currentPlayer || !currentPlayer.isCPU || winner) return;
+ /* ===== CPU自動行動 ===== */
+useEffect(() => {
+  if (!currentPlayer || !currentPlayer.isCPU || gameFinished) return;
 
-    const timer = setTimeout(() => {
-      cpuTurn(currentPlayer);
-    }, 800);
+  const timer = setTimeout(() => {
+    cpuTurn(currentPlayer);
+  }, 800);
 
-    return () => clearTimeout(timer);
-  }, [turnIndex, currentPlayer, winner]);
+  return () => clearTimeout(timer);
+
+}, [turnIndex, currentPlayer, gameFinished]); // ← ★ これが必要！！
 
   const cpuTurn = (cpu) => {
     const hand = cpu.hand;
@@ -215,12 +233,20 @@ useEffect(() => {
     let playable = [];
 
     Object.values(groups).forEach((g) => {
-      if (!field.table) playable.push([g[0]]);
-      else if (g.length >= field.table.count) {
-        const s = g.slice(0, field.table.count);
-        if (canPlaySet(s)) playable.push(s);
+      if (!g.length) return;
+    
+      if (!field.table) {
+        playable.push([...g]); // ← コピーして安全化
+        return;
+      }
+    
+      if (g.length === field.table.count && canPlaySet(g)) {
+        playable.push([...g]);
       }
     });
+    
+      
+    
 
     if (!playable.length) {
       setMessage(`${cpu.name} はパス`);
@@ -299,14 +325,10 @@ useEffect(() => {
       style={{
         height: "100vh",
         display: "grid",
-  
-        /* 3×3 テーブル配置 */
         gridTemplateColumns: "1fr 2fr 1fr",
         gridTemplateRows: "1fr 2fr 1fr",
-  
         background: "#0b5d1e",
         color: "white",
-  
         padding: 16,
         textAlign: "center",
         alignItems: "center",
@@ -322,44 +344,9 @@ useEffect(() => {
         {players[1] && renderCPU(players[1])}
       </div>
   
-      {/* ===== 中央（場） ===== */}
-      <div
-        style={{
-          gridColumn: 2,
-          gridRow: 2,
-  
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          alignItems: "center",
-  
-          fontSize: 28,
-          fontWeight: "bold",
-          minHeight: 120,
-        }}
-      >
-        {/* ⭐ メッセージ（8切り/革命/パス） */}
-        {message && (
-          <div
-            style={{
-              marginBottom: 12,
-              color: "#ffd700",
-              fontSize: 20,
-            }}
-          >
-            {message}
-          </div>
-        )}
-  
-        {field.table ? (
-          <div style={{ display: "flex", gap: 10 }}>
-            {Array.from({ length: field.table.count }).map((_, i) => (
-              <span key={i}>{field.table.rank}</span>
-            ))}
-          </div>
-        ) : (
-          <span>場は空です</span>
-        )}
+      {/* ===== 中央 ===== */}
+      <div style={{ gridColumn: 2, gridRow: 2 }}>
+        {field.table ? field.table.rank : "場は空です"}
       </div>
   
       {/* ===== 右 CPU3 ===== */}
@@ -367,19 +354,11 @@ useEffect(() => {
         {players[3] && renderCPU(players[3])}
       </div>
   
-      {/* ===== 下 YOU ===== */}
+      {/* ===== YOU ===== */}
       <div style={{ gridColumn: 2, gridRow: 3 }}>
         <h2>YOU</h2>
   
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            justifyContent: "center",
-            gap: 8,
-            marginBottom: 12,
-          }}
-        >
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {you?.hand.map((card, i) => (
             <Card
               key={i}
@@ -390,14 +369,44 @@ useEffect(() => {
           ))}
         </div>
   
-        {!winner && isYourTurn && !gameFinished && (
+        {/* ⭐ ボタン */}
+        {isYourTurn && !gameFinished && (
           <div>
             <button onClick={playCards}>出す</button>
             <button onClick={passTurn}>パス</button>
           </div>
         )}
       </div>
+  
+      {/* ⭐⭐ 結果発表（returnの中に入れるのが超重要） */}
+      {gameFinished && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.9)",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            alignItems: "center",
+            gap: 16,
+            fontSize: 26,
+            zIndex: 999,
+          }}
+        >
+          <h1>🎉 結果発表 🎉</h1>
+  
+          {rankedWithRoles.map((p, i) => (
+            <div key={i}>
+              {i + 1}位：{p.name} → {p.role}
+            </div>
+          ))}
+  
+          <button onClick={() => window.location.reload()}>
+            もう一回遊ぶ
+          </button>
+        </div>
+      )}
     </div>
   );
-  
-}
+}  

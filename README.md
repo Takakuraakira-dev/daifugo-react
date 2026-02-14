@@ -56,14 +56,18 @@ https://takakuraakira-dev.github.io/daifugo-react/
 ---
 ## 🚀 今後の改善予定
 
+-勝敗判定 
 - アニメーション追加
 - サウンド追加
 - UIデザイン強化
 - オンライン対戦機能（将来的に）
 - 7渡し、10捨て、12ボンバーなどの役職追加
----
+
 
 ## 👤 Author
 
 Akira Takakura  
 Frontend Engineer Portfolio
+
+---
+
