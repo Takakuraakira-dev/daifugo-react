@@ -7,21 +7,7 @@ const ROLE_MAP = [
   "🙂 平民",
   "💀 大貧民",
 ];
-const RANK_ORDER = {
-  "3": 1,
-  "4": 2,
-  "5": 3,
-  "6": 4,
-  "7": 5,
-  "8": 6,
-  "9": 7,
-  "10": 8,
-  "J": 9,
-  "Q": 10,
-  "K": 11,
-  "A": 12,
-  "2": 13,
-};
+
 export default function App() {
   /* ===== プレイヤー ===== */
   const [players, setPlayers] = useState([]);
@@ -51,9 +37,7 @@ export default function App() {
       hands[i % 4].push(card);
     });
     
-    hands.forEach((hand) => {
-      hand.sort((a, b) => RANK_ORDER[b.rank] - RANK_ORDER[a.rank]);
-    });
+    
     
     setPlayers([
       { id: "you", name: "YOU", hand: hands[0], isCPU: false },
